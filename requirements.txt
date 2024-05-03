@@ -44,6 +44,7 @@ langchain-pinecone==0.1.0
 langchain-text-splitters==0.0.1
 langdetect==1.0.9
 langsmith==0.1.48
+llmsherpa==0.1.4
 lxml==5.2.1
 MarkupSafe==2.1.5
 marshmallow==3.21.1
@@ -95,5 +96,6 @@ typing_extensions==4.11.0
 unstructured==0.13.2
 unstructured-client==0.18.0
 urllib3==2.2.1
+wikipedia==1.4.0
 wrapt==1.16.0
 yarl==1.9.4

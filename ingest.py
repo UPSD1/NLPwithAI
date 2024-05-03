@@ -25,7 +25,12 @@ from langchain_community.document_loaders import (
 
 from langchain.text_splitter import CharacterTextSplitter #Character splitting
 
-from thirdPartyIntegration import update_neo4j_vectordb, update_pinecone_vectordb
+from thirdPartyIntegration import (update_neo4j_vectordb, 
+                                   update_pinecone_vectordb,
+                                   ingestDocumentNeo4j)
+
+from datetime import datetime
+import time
 #====================================================================================
 
 #=============================== Variable Declaration ===============================
@@ -44,6 +49,10 @@ LOADER_MAPPING = {
     "url": (UnstructuredURLLoader, {}),
     # Add more mappings for other file extensions and loaders as needed
 }
+
+from llmsherpa.readers import LayoutPDFReader
+llmsherpa_api_url = "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+file_location = '../data'
 #=======================================================================================
 
 #================================ Function Declaration =================================
@@ -237,5 +246,31 @@ def store_document(document: List[Document], db = "neo4j"):
         return knowlegde_base
     
     return
+
+#load graph with pdf
+def load_graph_pdf(file_location = file_location):
+    
+    pdf_files = glob.glob(file_location + '/*.pdf')
+    print(f'#PDF files found: {len(pdf_files)}!')
+    pdf_reader = LayoutPDFReader(llmsherpa_api_url)
+
+    # parse documents and create graph
+    startTime = datetime.now()
+
+    for pdf_file in pdf_files:
+        doc = pdf_reader.read_pdf(pdf_file)
+
+        # find the first / in pdf_file from right
+        idx = pdf_file.rfind('/')
+        pdf_file_name = pdf_file[idx+1:]
+
+        # open a local file to write the JSON
+        with open(pdf_file_name + '.json', 'w') as f:
+            # convert doc.json from a list to string
+            f.write(str(doc.json))
+
+        ingestDocumentNeo4j(doc, pdf_file)
+
+    print(f'Total time: {datetime.now() - startTime}')
 
 #=========================================================================================
