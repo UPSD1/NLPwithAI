@@ -1,7 +1,8 @@
 from edIntegration import authenticate
 from thirdPartyIntegration import update_neo4j_vectordb, load_llm, load_embedding_model
 from search import vector_search, generate_response, configure_llm_only_chain, configure_qa_structure_rag_chain
-from langchain.graphs import Neo4jGraph
+from langchain_community.graphs import Neo4jGraph
+import time
 
 #Environmental Variable
 import os
@@ -51,9 +52,17 @@ def main():
 
     #query the KG and Vector DB
     model = setup()
-    result = model({"question": "What's the ultimate goal"})["answer"]
-
-    print(result)
+    while(True):
+        print("Enter your query below")
+        user_input = input()
+        if (user_input.lower().strip() == 'exit') or (user_input.lower().strip() == 'quit'):
+            break
+        start = time.time()
+        result = model.invoke({"question": user_input})["answer"]
+        print(f"\nquery > {user_input}")
+        print(f"AI > {result}")
+        print()
+        print(f"{time.time() - start: 0.4f}secs used\n")
 
 
 if __name__ == "__main__":
