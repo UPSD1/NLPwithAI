@@ -3,6 +3,8 @@
 from langchain.chains.question_answering import load_qa_chain
 from langchain.chains import RetrievalQAWithSourcesChain
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
+from langchain.chains import ConversationalRetrievalChain
+from langchain.chains.conversation.memory import ConversationBufferMemory
 from langchain.vectorstores.neo4j_vector import Neo4jVector
 from langchain.prompts.chat import (
     ChatPromptTemplate,
@@ -14,6 +16,11 @@ from langchain.prompts.chat import (
 from typing import List, Any #List type hint from the typing module
 from thirdPartyIntegration import claude_model, openai_model
 
+memory = ConversationBufferMemory(memory_key="chat_history", 
+                                  input_key="question", 
+                                  output_key="answer",
+                                  return_messages=True,
+                                  k = 5)
 #-------------------------------------------------------------------------------------------
 
 def vector_search(vectordb, query,db = "neo4j"):
@@ -192,7 +199,9 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
         retriever=kg.as_retriever(search_kwargs={"k": 25}),
         reduce_k_below_max_tokens=False,
         max_tokens_limit=7000,      # gpt-4
+        memory=memory,
     )
+
     return kg_qa
 
 def generate_response(vectordb, query,model_name = "anthropic"):
