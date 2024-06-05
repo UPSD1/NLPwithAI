@@ -211,9 +211,9 @@ def generate_response(vectordb, query,model_name = "anthropic"):
         model = openai_model
 
     chain = RetrievalQAWithSourcesChain.from_chain_type(model,
-                                                        chain_type="map_reduce",
+                                                        chain_type="stuff",
                                                         retriever=vectordb.as_retriever()
                                                         )
-    result = chain({"question": query},return_only_outputs=True)
+    result = chain.invoke({"question": query},return_only_outputs=True)
 
     return result

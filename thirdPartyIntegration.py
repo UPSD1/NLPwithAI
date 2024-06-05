@@ -46,7 +46,7 @@ openai_model = ChatOpenAI(model="gpt-3.5-turbo-0125",temperature=0, api_key=OPEN
 #--------------------------------Function Declaration---------------------------------------
 
 #*************** Neo4j ********************************
-def create_neo4j_vectordb(documents: List[Document]) -> Neo4jVector:
+def create_neo4j_vectordb(documents: List[Document], index_name: str, node_label:str) -> Neo4jVector:
     """
         Creates a Neo4j vector database from a list of documents.
 
@@ -96,16 +96,17 @@ def create_neo4j_vectordb(documents: List[Document]) -> Neo4jVector:
         url=NEO4J_URI,
         username=NEO4J_USERNAME,
         password=NEO4J_PASSWORD,
-        database="neo4j_ed",  # neo4j by default, neo4j_ed
+        database="neo4j",  # neo4j by default, neo4j_ed
         index_name= index_name,  # vector by default
-        node_label="edResources",  # Chunk by default
-        text_node_property="content",  # text by default | info
+        node_label=node_label,  # Chunk by default
+        text_node_property="info",  # text by default
         embedding_node_property="vector",  # embedding by default
         create_id_index=True,  # True by default
+
     )
     return neo4j_vector
 
-def update_neo4j_vectordb(documents: List[Document] = None, mode: int = 0) -> Union[Neo4jVector, Exception]:
+def update_neo4j_vectordb(documents: List[Document] = None, mode: int = 0, index_name:str = "vector", node_label:str = "chunk") -> Union[Neo4jVector, Exception]:
     """
         Updates a Neo4j vector database with new documents.
 
@@ -140,9 +141,12 @@ def update_neo4j_vectordb(documents: List[Document] = None, mode: int = 0) -> Un
     try:
         neo4j_db = Neo4jVector.from_existing_index(openAIEmbeddings, url=NEO4J_URI,
                                                 username=NEO4J_USERNAME,
-                                                password=NEO4J_PASSWORD, 
-                                                index_name="ed_ai",
-                                                text_node_property="content",)
+                                                password=NEO4J_PASSWORD,
+                                                database="neo4j",
+                                                index_name=index_name,
+                                                node_label=node_label,
+                                                text_node_property="info",
+                                                )
         #if the db is just requested
         if mode:
             return neo4j_db
@@ -155,7 +159,7 @@ def update_neo4j_vectordb(documents: List[Document] = None, mode: int = 0) -> Un
         neo4j_db.add_documents(documents)
     else:
         try:
-            neo4j_db = create_neo4j_vectordb(documents)
+            neo4j_db = create_neo4j_vectordb(documents, index_name, node_label)
         except Exception as e:
             return e
     return neo4j_db
