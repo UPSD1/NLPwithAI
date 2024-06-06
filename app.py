@@ -57,8 +57,32 @@ def main():
     model = setup()
 
 
-    #query the KG and Vector DB
-    # details = ed.get_thread(4947717)
+    # #query the KG and Vector DB on just 1 thread
+    # thread_no = 5021770 #5021784 #4974136 #5021770
+    # details = ed.get_thread(thread_no)
+    # #critiques
+    # if details['category'].lower() == "critiques":
+    #     print("Category --> Critiques")
+    #     response = generate_response(critique_vectordb, details['document'])['answer']
+    #     ed.post_comment(thread_no, response)
+    #     print("Answered")
+    #     return
+    # #exam
+    # if details['category'].lower() == "exams":
+    #     print("Category --> Exams")
+    #     response = generate_response(exam_vectordb, details['document'])['answer']
+    #     ed.post_comment(thread_no, response)
+    #     print("Answered")
+    #     return
+    
+    # result = model.invoke({"question": details['document']})["answer"]
+    # ed.post_comment(thread_no, result)
+    # print("Answered")
+
+
+
+
+    
     # result = model.invoke({"question": details['document']})["answer"]
     # print(f"\nquery > {details['document']}")
     # print(f"AI > {result}")
@@ -76,61 +100,70 @@ def main():
     #     print()
     #     print(f"{time.time() - start: 0.4f}secs used\n")
 
-    # thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
-
-    # for i in range(len(thread_lst)):
-    #     if(thread_lst[i]['id'] != 5012999):
-    #         details = ed.get_thread(thread_lst[i]['id'])
-    #         #category
-    #         if details['category'].lower() == "critiques":
-    #             print("Category --> Critiques")
-    #             response = generate_response(critique_vectordb, details['document'])['answer']
-    #             print(response)
-    #             ed.post_comment(thread_lst[i]['id'], response)
-    #             continue
-
-    #         result = model.invoke({"question": details['document']})["answer"]
-    #         ed.post_comment(thread_lst[i]['id'], result)
-    #     else:
-    #         break
-    
-    # print("Question Done")
-
-    # counter = 0
-    latest_id = 5021430
-    while(True):
-        thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
-        # counter += 1
-        # print(counter)
-        if(thread_lst[0]['id'] != latest_id):
-            print("found new question")
-            details = ed.get_thread(thread_lst[0]['id'])
-            #critiques
+    thread_lst = ed.list_threads(course_id, limit = 100, offset = 0, sort = "new" )
+    ignore = [5021784, 4974136, 5021770]
+    extra = "\n\n This guided response prompt"
+    for i in range(len(thread_lst)):
+        print(f"Answered {i+1} of {len(thread_lst)}")
+        if(thread_lst[i]['id'] not in ignore):
+            details = ed.get_thread(thread_lst[i]['id'])
+            #category
             if details['category'].lower() == "critiques":
                 print("Category --> Critiques")
                 response = generate_response(critique_vectordb, details['document'])['answer']
-                print(response)
-                ed.post_comment(thread_lst[0]['id'], response)
-                latest_id = thread_lst[0]['id']
-                print("Answered latest question")
-                time.sleep(1)
+                ed.post_comment(thread_lst[i]['id'], response+extra)
                 continue
             #exam
             if details['category'].lower() == "exams":
                 print("Category --> Exams")
                 response = generate_response(exam_vectordb, details['document'])['answer']
-                print(response)
-                ed.post_comment(thread_lst[0]['id'], response)
-                latest_id = thread_lst[0]['id']
-                print("Answered latest question")
-                time.sleep(1)
+                ed.post_comment(thread_lst[i]['id'], response+extra)
                 continue
-            
+
             result = model.invoke({"question": details['document']})["answer"]
-            ed.post_comment(thread_lst[0]['id'], result)
-            latest_id = thread_lst[0]['id']
-            print("Answered latest question")
-        time.sleep(1)
+            ed.post_comment(thread_lst[i]['id'], result+extra)
+        else:
+            print("skipping")
+            continue
+    print("done")
+    
+    # print("Question Done")
+
+    # counter = 0
+    # latest_id = 5021430
+    # while(True):
+    #     thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
+    #     # counter += 1
+    #     # print(counter)
+    #     if(thread_lst[0]['id'] != latest_id):
+    #         print("found new question")
+    #         details = ed.get_thread(thread_lst[0]['id'])
+    #         #critiques
+    #         if details['category'].lower() == "critiques":
+    #             print("Category --> Critiques")
+    #             response = generate_response(critique_vectordb, details['document'])['answer']
+    #             print(response)
+    #             ed.post_comment(thread_lst[0]['id'], response)
+    #             latest_id = thread_lst[0]['id']
+    #             print("Answered latest question")
+    #             time.sleep(1)
+    #             continue
+    #         #exam
+    #         if details['category'].lower() == "exams":
+    #             print("Category --> Exams")
+    #             response = generate_response(exam_vectordb, details['document'])['answer']
+    #             print(response)
+    #             ed.post_comment(thread_lst[0]['id'], response)
+    #             latest_id = thread_lst[0]['id']
+    #             print("Answered latest question")
+    #             time.sleep(1)
+    #             continue
+            
+    #         result = model.invoke({"question": details['document']})["answer"]
+    #         ed.post_comment(thread_lst[0]['id'], result)
+    #         latest_id = thread_lst[0]['id']
+    #         print("Answered latest question")
+    #     time.sleep(1)
         
 
 
