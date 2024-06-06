@@ -142,12 +142,14 @@ for i, thread in enumerate(thread_lst_duplicate):
    print("Cosine similarity:", similarity)
 
    category = ed.get_thread(thread_id)['category']
+   print(category)
    try:
-      evaluation_dict[category] = evaluation_dict[category].append(similarity)
+      evaluation_dict[category].append(similarity)
    except:
       evaluation_dict[category] = [similarity]
 
    evaluation_scores.append(similarity)
+   print(evaluation_dict)
    print("\n\n")
 
 print(evaluation_scores)
