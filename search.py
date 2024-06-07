@@ -11,6 +11,7 @@ from langchain.prompts.chat import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
+from langchain_core.messages import HumanMessage
 
 #others
 from typing import List, Any #List type hint from the typing module
@@ -123,7 +124,7 @@ def configure_qa_rag_chain(llm, embeddings, embeddings_store_url, username, pass
     )
     return kg_qa
 
-def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, username, password):
+def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, username, password, img_base64 = None):
     # RAG response based on vector search and retrieval of structured chunks
 
     sample_query = """
@@ -182,11 +183,30 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
     For example, if context has `metadata`:(source:'docu_url', page:1), you should display ('doc_url',  1).
     """
     general_user_template = "Question:```{question}```"
+    general_user_template_with_img = [
+        {
+            "type": "image_url",
+            "image_url": {
+                # langchain logo
+                "url": f"data:image/png;base64,{img_base64}",  # noqa: E501
+            },
+        },
+        {"type": "text", "text": general_user_template},
+        ]
     messages = [
         SystemMessagePromptTemplate.from_template(general_system_template),
         HumanMessagePromptTemplate.from_template(general_user_template),
     ]
-    qa_prompt = ChatPromptTemplate.from_messages(messages)
+    messages_with_image = [
+        SystemMessagePromptTemplate.from_template(general_system_template),
+        HumanMessage(content=general_user_template_with_img)
+    ]
+
+    if img_base64:
+        print("using image prompt")
+        qa_prompt = ChatPromptTemplate.from_messages(messages_with_image)
+    else:
+        qa_prompt = ChatPromptTemplate.from_messages(messages)
 
     qa_chain = load_qa_with_sources_chain(
         llm,
@@ -229,7 +249,7 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
 
     return kg_qa
 
-def generate_response(vectordb, query,model_name = "anthropic"):
+def generate_response(vectordb, query,model_name = "anthropic", img_base64 = None):
     if model_name.lower() == "anthropic":
         model = claude_model
     else:
@@ -271,13 +291,31 @@ def generate_response(vectordb, query,model_name = "anthropic"):
     At the end of each answer you should contain metadata for relevant document in the form of (source, page).
     For example, if context has `metadata`:(source:'docu_url', page:1), you should display ('doc_url',  1).
     """
-
     general_user_template = "Question:```{question}```"
+    general_user_template_with_img = [
+        {
+            "type": "image_url",
+            "image_url": {
+                # langchain logo
+                "url": f"data:image/png;base64,{img_base64}",  # noqa: E501
+            },
+        },
+        {"type": "text", "text": general_user_template},
+        ]
     messages = [
         SystemMessagePromptTemplate.from_template(general_system_template),
         HumanMessagePromptTemplate.from_template(general_user_template),
     ]
-    qa_prompt = ChatPromptTemplate.from_messages(messages)
+    messages_with_image = [
+        SystemMessagePromptTemplate.from_template(general_system_template),
+        HumanMessage(content=general_user_template_with_img)
+    ]
+
+    if img_base64:
+        print("using image prompt")
+        qa_prompt = ChatPromptTemplate.from_messages(messages_with_image)
+    else:
+        qa_prompt = ChatPromptTemplate.from_messages(messages)
 
     qa_chain = load_qa_with_sources_chain(
         model,

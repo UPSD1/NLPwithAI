@@ -1,4 +1,4 @@
-from edIntegration import authenticate, ed
+from edIntegration import authenticate, ed, post_comment
 from thirdPartyIntegration import update_neo4j_vectordb, load_llm, load_embedding_model
 from search import vector_search, generate_response, configure_llm_only_chain, configure_qa_structure_rag_chain
 from langchain_community.graphs import Neo4jGraph
@@ -6,6 +6,9 @@ import time
 
 #Environmental Variable
 import os
+import base64
+import requests
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,31 +23,57 @@ NEO4J_DATABASE = "neo4j"
 llm_name = "claude"
 course_id = 58877
 
-def setup():
-    embeddings, dimension = load_embedding_model()
+def extract_possible_image_url(content):
+  """
+  This function attempts to extract the URL from an image tag within the provided content (HTML string).
 
-    llm = load_llm(llm_name)
+  Args:
+      content: A string containing HTML content.
 
-    # llm_chain: LLM only response
-    llm_chain = configure_llm_only_chain(llm)
+  Returns:
+      The extracted URL (if found), or None if no image tag is found.
 
-    # rag_chain: KG augmented response
-    rag_chain = configure_qa_structure_rag_chain(
-        llm, embeddings, embeddings_store_url=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD
-    )
-
-    return rag_chain
-
-# comment = ed.post_comment(4966179, param)
+  Notes:
+      This function only extracts the URL and doesn't guarantee it's a valid image.
+  """
+  
+  # Search for the image tag using regular expressions
+  match = re.search(r'<figure><image src="([^"]+)"', content)
+  if match:
+    # Extract the URL from the matched group (index 1)
+    url = match.group(1)
+    
+    # Check for common image extensions (optional, for reference)
+    # if url.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+    #   return url
+    
+    # You can add additional checks based on context (e.g., keywords) here
+    
+    return url
+  
+  # No image tag found
+  return None
 
 def main():
     status, _= authenticate(verbose=False)
     if status: #if authentication was successful
         print("logged in")
 
+    #load model
+    embeddings, _ = load_embedding_model()
+
+    llm = load_llm(llm_name)
+
+    # rag_chain: KG augmented response
+    model = configure_qa_structure_rag_chain(
+        llm, embeddings, embeddings_store_url=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD
+    )
+
     # #get already existing db
     critique_vectordb = update_neo4j_vectordb(mode=1, index_name = "critique", node_label = "critique-instruction")
     exam_vectordb = update_neo4j_vectordb(mode=1, index_name = "exam_general", node_label = "exam-instruction")    
+
+
     # response = generate_response(critique_vectordb, "Give me steps on how to critique")['answer']
     # print(response)
 
@@ -52,14 +81,28 @@ def main():
     # query = "What's the Ultimate Goal?"
     # result = vector_search(vectordb, query)
     # print(result)
-    
-    #load model
-    model = setup()
 
 
-    # #query the KG and Vector DB on just 1 thread
-    # thread_no = 5021770 #5021784 #4974136 #5021770
+    # #query the KG and Vector DB on just 1 thread 
+    # thread_no = 952904 #5021784 #4974136 #5021770
     # details = ed.get_thread(thread_no)
+    # #extract url and preprocess
+    # url = extract_possible_image_url(details['content'])
+    # data = requests.get(url).content
+    # img_base64 = base64.b64encode(data).decode("utf-8")
+
+    # rag_chain_img = configure_qa_structure_rag_chain(
+    #     llm, embeddings, embeddings_store_url=NEO4J_URI, 
+    #     username=NEO4J_USERNAME, password=NEO4J_PASSWORD,
+    #     img_base64=img_base64
+    # )
+    
+    # print("trying to answer the question")
+    # print(f"Question:{details['document']}")
+    # result = rag_chain_img.invoke({"question": details['document']})["answer"]
+    # print(result)
+    # print("Answered")
+
     # #critiques
     # if details['category'].lower() == "critiques":
     #     print("Category --> Critiques")
@@ -100,70 +143,110 @@ def main():
     #     print()
     #     print(f"{time.time() - start: 0.4f}secs used\n")
 
-    thread_lst = ed.list_threads(course_id, limit = 100, offset = 0, sort = "new" )
-    ignore = [5021784, 4974136, 5021770]
-    extra = "\n\n This guided response prompt"
-    for i in range(len(thread_lst)):
-        print(f"Answered {i+1} of {len(thread_lst)}")
-        if(thread_lst[i]['id'] not in ignore):
-            details = ed.get_thread(thread_lst[i]['id'])
-            #category
-            if details['category'].lower() == "critiques":
-                print("Category --> Critiques")
-                response = generate_response(critique_vectordb, details['document'])['answer']
-                ed.post_comment(thread_lst[i]['id'], response+extra)
-                continue
-            #exam
-            if details['category'].lower() == "exams":
-                print("Category --> Exams")
-                response = generate_response(exam_vectordb, details['document'])['answer']
-                ed.post_comment(thread_lst[i]['id'], response+extra)
-                continue
-
-            result = model.invoke({"question": details['document']})["answer"]
-            ed.post_comment(thread_lst[i]['id'], result+extra)
-        else:
-            print("skipping")
-            continue
-    print("done")
-    
-    # print("Question Done")
-
-    # counter = 0
-    # latest_id = 5021430
-    # while(True):
-    #     thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
-    #     # counter += 1
-    #     # print(counter)
-    #     if(thread_lst[0]['id'] != latest_id):
-    #         print("found new question")
-    #         details = ed.get_thread(thread_lst[0]['id'])
-    #         #critiques
+    # thread_lst = ed.list_threads(course_id, limit = 100, offset = 0, sort = "new" )
+    # ignore = [5021784, 4974136, 5021770]
+    # extra = "\n\n This guided response prompt"
+    # for i in range(len(thread_lst)):
+    #     print(f"Answered {i+1} of {len(thread_lst)}")
+    #     if(thread_lst[i]['id'] not in ignore):
+    #         details = ed.get_thread(thread_lst[i]['id'])
+    #         #category
     #         if details['category'].lower() == "critiques":
     #             print("Category --> Critiques")
     #             response = generate_response(critique_vectordb, details['document'])['answer']
-    #             print(response)
-    #             ed.post_comment(thread_lst[0]['id'], response)
-    #             latest_id = thread_lst[0]['id']
-    #             print("Answered latest question")
-    #             time.sleep(1)
+    #             ed.post_comment(thread_lst[i]['id'], response+extra)
     #             continue
     #         #exam
     #         if details['category'].lower() == "exams":
     #             print("Category --> Exams")
     #             response = generate_response(exam_vectordb, details['document'])['answer']
-    #             print(response)
-    #             ed.post_comment(thread_lst[0]['id'], response)
-    #             latest_id = thread_lst[0]['id']
-    #             print("Answered latest question")
-    #             time.sleep(1)
+    #             ed.post_comment(thread_lst[i]['id'], response+extra)
     #             continue
-            
+
     #         result = model.invoke({"question": details['document']})["answer"]
-    #         ed.post_comment(thread_lst[0]['id'], result)
-    #         latest_id = thread_lst[0]['id']
-    #         print("Answered latest question")
-    #     time.sleep(1)
+    #         ed.post_comment(thread_lst[i]['id'], result+extra)
+    #     else:
+    #         print("skipping")
+    #         continue
+    # print("done")
+    
+    # print("Question Done")
+
+
+    # counter = 0
+    latest_id = 5021430
+    while(True):
+        thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
+        # counter += 1
+        # print(counter)
+        if(thread_lst[0]['id'] != latest_id):
+            print("found new question")
+            details = ed.get_thread(thread_lst[0]['id'])
+            #get url if available
+            url = extract_possible_image_url(details['content'])
+
+            if url != None:
+                #critiques
+                if details['category'].lower() == "critiques":
+                    print("Category --> Critiques")
+                    response = generate_response(critique_vectordb, details['document'])['answer']
+                    print(response)
+                    post_comment(thread_lst[0]['id'], response)
+                    latest_id = thread_lst[0]['id']
+                    print("Answered latest question")
+                    time.sleep(1)
+                    continue
+                #exam
+                if details['category'].lower() == "exams":
+                    print("Category --> Exams")
+                    response = generate_response(exam_vectordb, details['document'])['answer']
+                    print(response)
+                    post_comment(thread_lst[0]['id'], response)
+                    latest_id = thread_lst[0]['id']
+                    print("Answered latest question")
+                    time.sleep(1)
+                    continue
+                
+                result = model.invoke({"question": details['document']})["answer"]
+                post_comment(thread_lst[0]['id'], result)
+                latest_id = thread_lst[0]['id']
+                print("Answered latest question")
+            else:
+                data = requests.get(url).content
+                img_base64 = base64.b64encode(data).decode("utf-8")
+
+                #critiques
+                if details['category'].lower() == "critiques":
+                    print("Category --> Critiques")
+                    response = generate_response(critique_vectordb, details['document'], img_base64)['answer']
+                    print(response)
+                    post_comment(thread_lst[0]['id'], response)
+                    latest_id = thread_lst[0]['id']
+                    print("Answered latest question")
+                    time.sleep(1)
+                    continue
+                #exam
+                if details['category'].lower() == "exams":
+                    print("Category --> Exams")
+                    response = generate_response(exam_vectordb, details['document'], img_base64)['answer']
+                    print(response)
+                    post_comment(thread_lst[0]['id'], response)
+                    latest_id = thread_lst[0]['id']
+                    print("Answered latest question")
+                    time.sleep(1)
+                    continue
+
+                rag_chain_img = configure_qa_structure_rag_chain(
+                    llm, embeddings, embeddings_store_url=NEO4J_URI,
+                    username=NEO4J_USERNAME, password=NEO4J_PASSWORD,
+                    img_base64=img_base64
+                    )
+                result = rag_chain_img.invoke({"question": details['document']})["answer"]
+                post_comment(thread_lst[0]['id'], result)
+                latest_id = thread_lst[0]['id']
+                print("Answered latest question")
+                       
+        time.sleep(1)
         
 
 
