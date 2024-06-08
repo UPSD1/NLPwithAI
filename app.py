@@ -184,8 +184,9 @@ def main():
             details = ed.get_thread(thread_lst[0]['id'])
             #get url if available
             url = extract_possible_image_url(details['content'])
+            # print(url)
 
-            if url != None:
+            if url == None:
                 #critiques
                 if details['category'].lower() == "critiques":
                     print("Category --> Critiques")
