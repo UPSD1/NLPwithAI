@@ -143,111 +143,192 @@ def main():
     #     print()
     #     print(f"{time.time() - start: 0.4f}secs used\n")
 
-    # thread_lst = ed.list_threads(course_id, limit = 100, offset = 0, sort = "new" )
-    # ignore = [5021784, 4974136, 5021770]
-    # extra = "\n\n This guided response prompt"
-    # for i in range(len(thread_lst)):
-    #     print(f"Answered {i+1} of {len(thread_lst)}")
-    #     if(thread_lst[i]['id'] not in ignore):
-    #         details = ed.get_thread(thread_lst[i]['id'])
-    #         #category
-    #         if details['category'].lower() == "critiques":
-    #             print("Category --> Critiques")
-    #             response = generate_response(critique_vectordb, details['document'])['answer']
-    #             ed.post_comment(thread_lst[i]['id'], response+extra)
-    #             continue
-    #         #exam
-    #         if details['category'].lower() == "exams":
-    #             print("Category --> Exams")
-    #             response = generate_response(exam_vectordb, details['document'])['answer']
-    #             ed.post_comment(thread_lst[i]['id'], response+extra)
-    #             continue
+    offset = 0
+    thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
 
-    #         result = model.invoke({"question": details['document']})["answer"]
-    #         ed.post_comment(thread_lst[i]['id'], result+extra)
-    #     else:
-    #         print("skipping")
-    #         continue
-    # print("done")
-    
-    # print("Question Done")
+    def answer_all_thread(thread_lst, offset):
+        for i, thread in enumerate(thread_lst):
+            print(f"Thread {offset+i+1} --> {thread['category']}")
 
+            #if post is an announcement skip
+            if thread["type"].lower() == "announcement":
+                continue
 
-    # counter = 0
-    latest_id = 5021430
-    while(True):
-        thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
-        # counter += 1
-        # print(counter)
-        if(thread_lst[0]['id'] != latest_id):
-            print("found new question")
-            details = ed.get_thread(thread_lst[0]['id'])
-            #get url if available
-            url = extract_possible_image_url(details['content'])
+            #Quizzes or Projects
+            if thread['category'].lower() in ["projects","quizzes"]:
+                time.sleep(1)
+                #Recursively loop through all threads
+                if i == len(thread_lst)-1:
+                    offset += len(thread_lst)
+                    thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                    answer_all_thread(thread_lst, offset)
+                continue
+
+            # get url if available
+            url = extract_possible_image_url(thread['content'])
             # print(url)
 
             if url == None:
                 #critiques
-                if details['category'].lower() == "critiques":
-                    print("Category --> Critiques")
-                    response = generate_response(critique_vectordb, details['document'])['answer']
-                    print(response)
-                    post_comment(thread_lst[0]['id'], response)
-                    latest_id = thread_lst[0]['id']
-                    print("Answered latest question")
-                    time.sleep(1)
+                if thread['category'].lower() == "critiques":
+                    response = generate_response(critique_vectordb, thread['document'])['answer']
+                    post_comment(thread['id'], response)
+                    print("Answered...")
+
+                    #Recursively loop through all threads
+                    if i == len(thread_lst)-1:
+                        offset += len(thread_lst)
+                        thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                        answer_all_thread(thread_lst, offset)
                     continue
                 #exam
-                if details['category'].lower() == "exams":
-                    print("Category --> Exams")
-                    response = generate_response(exam_vectordb, details['document'])['answer']
-                    print(response)
-                    post_comment(thread_lst[0]['id'], response)
-                    latest_id = thread_lst[0]['id']
-                    print("Answered latest question")
-                    time.sleep(1)
+                if thread['category'].lower() == "exams":
+                    response = generate_response(exam_vectordb, thread['document'])['answer']
+                    post_comment(thread['id'], response)
+                    print("Answered...")
+
+                    #Recursively loop through all threads
+                    if i == len(thread_lst)-1:
+                        offset += len(thread_lst)
+                        thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                        answer_all_thread(thread_lst, offset)
                     continue
                 
-                result = model.invoke({"question": details['document']})["answer"]
-                post_comment(thread_lst[0]['id'], result)
-                latest_id = thread_lst[0]['id']
-                print("Answered latest question")
+                result = model.invoke({"question": thread['document']})["answer"]
+                # print(result)
+                post_comment(thread['id'], result)
+                print("Answered...")
+
             else:
-                data = requests.get(url).content
+                img = requests.get(url)
+                data = img.content
+                img_type = img.headers['Content-Type']
                 img_base64 = base64.b64encode(data).decode("utf-8")
+                # print(img_base64)
 
                 #critiques
-                if details['category'].lower() == "critiques":
-                    print("Category --> Critiques")
-                    response = generate_response(critique_vectordb, details['document'], img_base64)['answer']
-                    print(response)
-                    post_comment(thread_lst[0]['id'], response)
-                    latest_id = thread_lst[0]['id']
-                    print("Answered latest question")
-                    time.sleep(1)
-                    continue
-                #exam
-                if details['category'].lower() == "exams":
-                    print("Category --> Exams")
-                    response = generate_response(exam_vectordb, details['document'], img_base64)['answer']
-                    print(response)
-                    post_comment(thread_lst[0]['id'], response)
-                    latest_id = thread_lst[0]['id']
-                    print("Answered latest question")
-                    time.sleep(1)
+                if thread['category'].lower() == "critiques":
+                    response = generate_response(critique_vectordb, thread['document'], img_base64 = img_base64, img_type = img_type)['answer']
+                    post_comment(thread['id'], response)
+                    print("Answered...")
+
+                    #Recursively loop through all threads
+                    if i == len(thread_lst)-1:
+                        offset += len(thread_lst)
+                        thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                        answer_all_thread(thread_lst, offset)
                     continue
 
+                #exam
+                if thread['category'].lower() == "exams":
+                    response = generate_response(exam_vectordb, thread['document'],img_base64 = img_base64, img_type = img_type)['answer']
+                    post_comment(thread['id'], response)
+                    print("Answered...")
+
+                    #Recursively loop through all threads
+                    if i == len(thread_lst)-1:
+                        offset += len(thread_lst)
+                        thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                        answer_all_thread(thread_lst, offset)
+                    continue
+               
                 rag_chain_img = configure_qa_structure_rag_chain(
                     llm, embeddings, embeddings_store_url=NEO4J_URI,
                     username=NEO4J_USERNAME, password=NEO4J_PASSWORD,
-                    img_base64=img_base64
+                    img_base64=img_base64, img_type = img_type
                     )
-                result = rag_chain_img.invoke({"question": details['document']})["answer"]
-                post_comment(thread_lst[0]['id'], result)
-                latest_id = thread_lst[0]['id']
-                print("Answered latest question")
+                result = rag_chain_img.invoke({"question": thread['document']})["answer"]
+                post_comment(thread['id'], result)
+                print("Answered...")
+        
+            #Recursively loop through all threads
+            if i == len(thread_lst)-1:
+                offset += len(thread_lst)
+                thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
+                answer_all_thread(thread_lst, offset)
+
+            # break
+        print("done")
+    
+    answer_all_thread(thread_lst, offset)
+    print("Question Done")
+
+
+    # counter = 0
+    # latest_id = 5021430
+    # while(True):
+    #     thread_lst = ed.list_threads(course_id, limit = 30, offset = 0, sort = "new" )
+    #     # counter += 1
+    #     # print(counter)
+    #     if(thread_lst[0]['id'] != latest_id):
+    #         print("found new question")
+    #         details = ed.get_thread(thread_lst[0]['id'])
+    #         #get url if available
+    #         url = extract_possible_image_url(details['content'])
+    #         # print(url)
+
+    #         if url == None:
+    #             #critiques
+    #             if details['category'].lower() == "critiques":
+    #                 print("Category --> Critiques")
+    #                 response = generate_response(critique_vectordb, details['document'])['answer']
+    #                 print(response)
+    #                 post_comment(thread_lst[0]['id'], response)
+    #                 latest_id = thread_lst[0]['id']
+    #                 print("Answered latest question")
+    #                 time.sleep(1)
+    #                 continue
+    #             #exam
+    #             if details['category'].lower() == "exams":
+    #                 print("Category --> Exams")
+    #                 response = generate_response(exam_vectordb, details['document'])['answer']
+    #                 print(response)
+    #                 post_comment(thread_lst[0]['id'], response)
+    #                 latest_id = thread_lst[0]['id']
+    #                 print("Answered latest question")
+    #                 time.sleep(1)
+    #                 continue
+                
+    #             result = model.invoke({"question": details['document']})["answer"]
+    #             post_comment(thread_lst[0]['id'], result)
+    #             latest_id = thread_lst[0]['id']
+    #             print("Answered latest question")
+    #         else:
+    #             data = requests.get(url).content
+    #             img_base64 = base64.b64encode(data).decode("utf-8")
+
+    #             #critiques
+    #             if details['category'].lower() == "critiques":
+    #                 print("Category --> Critiques")
+    #                 response = generate_response(critique_vectordb, details['document'], img_base64)['answer']
+    #                 print(response)
+    #                 post_comment(thread_lst[0]['id'], response)
+    #                 latest_id = thread_lst[0]['id']
+    #                 print("Answered latest question")
+    #                 time.sleep(1)
+    #                 continue
+    #             #exam
+    #             if details['category'].lower() == "exams":
+    #                 print("Category --> Exams")
+    #                 response = generate_response(exam_vectordb, details['document'], img_base64)['answer']
+    #                 print(response)
+    #                 post_comment(thread_lst[0]['id'], response)
+    #                 latest_id = thread_lst[0]['id']
+    #                 print("Answered latest question")
+    #                 time.sleep(1)
+    #                 continue
+
+    #             rag_chain_img = configure_qa_structure_rag_chain(
+    #                 llm, embeddings, embeddings_store_url=NEO4J_URI,
+    #                 username=NEO4J_USERNAME, password=NEO4J_PASSWORD,
+    #                 img_base64=img_base64
+    #                 )
+    #             result = rag_chain_img.invoke({"question": details['document']})["answer"]
+    #             post_comment(thread_lst[0]['id'], result)
+    #             latest_id = thread_lst[0]['id']
+    #             print("Answered latest question")
                        
-        time.sleep(1)
+    #     time.sleep(1)
         
 
 

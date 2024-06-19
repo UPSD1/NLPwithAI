@@ -124,7 +124,7 @@ def configure_qa_rag_chain(llm, embeddings, embeddings_store_url, username, pass
     )
     return kg_qa
 
-def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, username, password, img_base64 = None):
+def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, username, password, img_base64 = None, img_type = None):
     # RAG response based on vector search and retrieval of structured chunks
 
     sample_query = """
@@ -188,7 +188,7 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
             "type": "image_url",
             "image_url": {
                 # langchain logo
-                "url": f"data:image/png;base64,{img_base64}",  # noqa: E501
+                "url": f"data:{img_type};base64,{img_base64}",  # noqa: E501
             },
         },
         {"type": "text", "text": general_user_template},
@@ -249,7 +249,7 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
 
     return kg_qa
 
-def generate_response(vectordb, query,model_name = "anthropic", img_base64 = None):
+def generate_response(vectordb, query,model_name = "anthropic", img_base64 = None, img_type = None):
     if model_name.lower() == "anthropic":
         model = claude_model
     else:
@@ -297,7 +297,7 @@ def generate_response(vectordb, query,model_name = "anthropic", img_base64 = Non
             "type": "image_url",
             "image_url": {
                 # langchain logo
-                "url": f"data:image/png;base64,{img_base64}",  # noqa: E501
+                "url": f"data:{img_type};base64,{img_base64}",  # noqa: E501
             },
         },
         {"type": "text", "text": general_user_template},

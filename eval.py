@@ -11,7 +11,7 @@ OPEN_AI_KEY = os.getenv('OPEN_AI_SECRET_KEY')
 embeddings = OpenAIEmbeddings(model="text-embedding-3-large", api_key=OPEN_AI_KEY)
 course_id_original = 12801
 course_id_duplicate = 58877
-priority_ids = [146168]
+priority_ids = [146168, 336652, 133439, 304091, 155425, 151439, 147345, 132907, 132929]
 skip_number = []
 # initialize Ed API
 ed = EdAPI()
@@ -76,81 +76,116 @@ def cosine_similarity(embedding1, embedding2):
   cosine_similarity = dot_product / (magnitude1 * magnitude2)
   return cosine_similarity
 
-def find_similar_title(title, offset):
-#    print("Entered")
-   #  time.sleep(1)
+def find_similar_title(title, content, offset):
     thread_lst_original = ed.list_threads(course_id_original, limit = 100, offset = offset, sort = "new" )
     
     #if we have no thread again
     if thread_lst_original == []:
-        return
+      return
     
     for i , orig_thread in enumerate(thread_lst_original):
-            # print(f"Thread number {offset + i}")
-            #get the id
-            orig_thread_id = orig_thread['id']
+      if (orig_thread["type"].lower() == "announcement") or (orig_thread['category'].lower() in ["projects","quizzes"]):
+        if i == (len(thread_lst_original) - 1):
+          result = find_similar_title(title, content, offset=offset + len(thread_lst_original))
+          return result
+        
+        time.sleep(1)
+        continue
 
-            #use the id to get the title
-            orig_title = ed.get_thread(orig_thread_id)['title'].lower().strip()
-            
-            #if the two title are the same
-            if orig_title == title:
-                print(f"thread id {orig_thread_id}")
-                #get the answer attached the thread by TA
-                if len(ed.get_thread(orig_thread_id)['answers']) > 1:
-                    for answer in ed.get_thread(orig_thread_id)['answers']:
-                        if answer['user_id'] in priority_ids:
-                            result = answer['document']
-                            return result
-                
-                response = ed.get_thread(orig_thread_id)['answers'][0]['document'] if ed.get_thread(orig_thread_id)['answers'] else None
-                return response
-            
-            if i == (len(thread_lst_original) - 1):
-                result = find_similar_title(title, offset=offset + len(thread_lst_original))
-                return result
+      #get the id
+      orig_thread_id = orig_thread['id']
+      orig_title = orig_thread['title']
+      orig_content = orig_thread['document']
+      
+      #if the two title are the same and the questions also match
+      if (orig_title == title) and (orig_content == content):
+          print(f"thread id {orig_thread_id}")
+          #get the answer attached the thread by TA
+          data = ed.get_thread(orig_thread_id)
+
+          if data['answers'] == []:
+             print("Not answered in main")
+             return
+          #check if we have multiple responses
+          if len(data['answers']) >= 1:
+              for answer in data['answers']:
+                  if answer['user_id'] in priority_ids:
+                      result = answer['document']
+                      return result
+                  else:
+                     print("Question not answered by a staff")
+                     return
+          
+          # response = data['answers'][0]['document'] if data['answers'] else None
+          # return response
+      
+      if i == (len(thread_lst_original) - 1):
+          result = find_similar_title(title, content,offset=offset + len(thread_lst_original))
+          return result
 
 #retrieve list thread in a course
-thread_lst_duplicate = ed.list_threads(course_id_duplicate, limit = 100, offset = 0, sort = "new" )
+offset = 0
+thread_lst_duplicate = ed.list_threads(course_id_duplicate, limit = 100, offset = offset, sort = "new" )
 
 evaluation_scores = []
 evaluation_dict = {}
 count = 0 #used to find how many questions appeared in both  courses
 
-for i, thread in enumerate(thread_lst_duplicate):
-   print(f"Thread {i+1} of {len(thread_lst_duplicate)}")
-   if i in skip_number:
+def evaluate(thread_lst_duplicate, offset):
+  if thread_lst_duplicate == []:
+     return
+  
+  #loop through
+  for i, thread in enumerate(thread_lst_duplicate):
+    print(f"Thread {offset+i+1}")
+
+    if (thread["type"].lower() == "announcement") or (thread['category'].lower() in ["projects","quizzes"]):
+        if i == (len(thread_lst_duplicate) - 1):
+          offset = offset + len(thread_lst_duplicate)
+          thread_lst_duplicate = ed.list_threads(course_id_duplicate, limit = 100, offset = offset, sort = "new" )
+          evaluate(thread_lst_duplicate, offset=offset)
+        time.sleep(1)
+        continue
+    
+    #get the id
+    thread_id = thread['id']
+    title = thread['title']
+    content = thread['document']
+
+    ai_resp = ed.get_thread(thread_id)['answers'][0]['document'] if ed.get_thread(thread_id)['answers'] else None
+    #if the AI answered
+    if ai_resp:
+      ta_resp = find_similar_title(title=title, content = content, offset=0)
+    
+
+    if (ta_resp == None) or (ai_resp == None):
+      if i == (len(thread_lst_duplicate) - 1):
+        offset = offset + len(thread_lst_duplicate)
+        thread_lst_duplicate = ed.list_threads(course_id_duplicate, limit = 100, offset = offset, sort = "new" )
+        evaluate(thread_lst_duplicate, offset=offset)
+      time.sleep(1)
       continue
-   #get the id
-   thread_id = thread['id']
-   title = ed.get_thread(thread_id)['title'].lower().strip()
+    
+    print(title)
 
-   ta_resp = find_similar_title(title=title, offset=0)
-   ai_resp = ed.get_thread(thread_id)['answers'][0]['document'] if ed.get_thread(thread_id)['answers'] else None
+    embedding1 = embeddings.embed_query(ta_resp)
+    embedding2 = embeddings.embed_query(ai_resp)
 
-   if (ta_resp == None) or (ai_resp == None):
-      continue
-   
-   count += 1
-   print(count)
-   print(title)
+    similarity = cosine_similarity(embedding1, embedding2)
+    print("Cosine similarity:", similarity)
 
-   embedding1 = embeddings.embed_query(ta_resp)
-   embedding2 = embeddings.embed_query(ai_resp)
+    category = thread['category']
+    print(category)
+    try:
+        evaluation_dict[category].append(similarity)
+    except:
+        evaluation_dict[category] = [similarity]
 
-   similarity = cosine_similarity(embedding1, embedding2)
-   print("Cosine similarity:", similarity)
+    evaluation_scores.append(similarity)
+    print(evaluation_dict)
+    print("\n\n")
 
-   category = ed.get_thread(thread_id)['category']
-   print(category)
-   try:
-      evaluation_dict[category].append(similarity)
-   except:
-      evaluation_dict[category] = [similarity]
-
-   evaluation_scores.append(similarity)
-   print(evaluation_dict)
-   print("\n\n")
+evaluate(thread_lst_duplicate, offset)
 
 print(evaluation_scores)
 print(f"Overall evaluation is {sum(evaluation_scores)/len(evaluation_scores)}")
