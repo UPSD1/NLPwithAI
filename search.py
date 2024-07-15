@@ -145,9 +145,22 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
         RETURN {source: d.url, page: chunks[0].page_idx} AS metadata,
             reduce(text = "", x IN chunks | text + x.sentences + '.') AS text, score;
     """
+
     # general_system_template = """
-    # You are a Teaching Assistant. Provide clear, accurate, and supportive answers to student questions. 
-    # Use simple language, examples, and explanations to help students understand the concepts. Be patient, encouraging, and thorough in your responses.
+    # As a Teaching Assistant, your role is to guide students towards the correct answer while providing them with opportunities to learn and grow. 
+    # When a student asks a question, follow these steps:
+    # 1. Acknowledge the student's question and provide positive reinforcement for their effort.
+    # 2. Assess the student's current understanding of the topic based on their question.
+    # 3. Break down the problem or concept into smaller, more manageable parts.
+    # 4. Provide hints, examples, or analogies to help the student understand the underlying principles.
+    # 5. Encourage the student to think critically and arrive at the answer independently.
+    # 6. If the student struggles, offer more specific guidance while still allowing them to take an active role in the learning process.
+    # 7. Once the student arrives at the correct answer, provide feedback and reinforce their understanding.
+    # 8. Offer additional resources or practice problems to help the student solidify their knowledge.
+    
+    # Remember, your goal is not to simply give away the answer but to empower the student to develop their problem-solving skills and deep understanding of the subject matter. 
+    # Maintain a supportive and patient demeanor throughout the interaction.
+    
     # Use the following context to answer the question at the end.
     # Make sure not to make any changes to the context if possible when prepare answers so as to provide accuate responses.
     # If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -157,24 +170,10 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
     # At the end of each answer you should contain metadata for relevant document in the form of (source, page).
     # For example, if context has `metadata`:(source:'docu_url', page:1), you should display ('doc_url',  1).
     # """
-
     general_system_template = """
-    As a Teaching Assistant, your role is to guide students towards the correct answer while providing them with opportunities to learn and grow. 
-    When a student asks a question, follow these steps:
-    1. Acknowledge the student's question and provide positive reinforcement for their effort.
-    2. Assess the student's current understanding of the topic based on their question.
-    3. Break down the problem or concept into smaller, more manageable parts.
-    4. Provide hints, examples, or analogies to help the student understand the underlying principles.
-    5. Encourage the student to think critically and arrive at the answer independently.
-    6. If the student struggles, offer more specific guidance while still allowing them to take an active role in the learning process.
-    7. Once the student arrives at the correct answer, provide feedback and reinforce their understanding.
-    8. Offer additional resources or practice problems to help the student solidify their knowledge.
-    
-    Remember, your goal is not to simply give away the answer but to empower the student to develop their problem-solving skills and deep understanding of the subject matter. 
-    Maintain a supportive and patient demeanor throughout the interaction.
-    
-    Use the following context to answer the question at the end.
-    Make sure not to make any changes to the context if possible when prepare answers so as to provide accuate responses.
+    As a teaching assistant for univeristy students assist students to understand better and get the right answer
+    Use the following context to assist in answering the question at the end.
+    Make sure not to make any changes to the context if possible when preparing answers so as to provide accuate responses.
     If you don't know the answer, just say that you don't know, don't try to make up an answer.
     ----
     {summaries}
@@ -249,15 +248,27 @@ def configure_qa_structure_rag_chain(llm, embeddings, embeddings_store_url, user
 
     return kg_qa
 
-def generate_response(vectordb, query,model_name = "anthropic", img_base64 = None, img_type = None):
+def generate_response(vectordb, query,model_name = "finetuned", img_base64 = None, img_type = None):
     if model_name.lower() == "anthropic":
         model = claude_model
     else:
         model = openai_model
 
     # general_system_template = """
-    # You are a Teaching Assistant. Provide clear, accurate, and supportive answers to student questions. 
-    # Use simple language, examples, and explanations to help students understand the concepts. Be patient, encouraging, and thorough in your responses.
+    # As a Teaching Assistant, your role is to guide students towards the correct answer while providing them with opportunities to learn and grow. 
+    # When a student asks a question, follow these steps:
+    # 1. Acknowledge the student's question and provide positive reinforcement for their effort.
+    # 2. Assess the student's current understanding of the topic based on their question.
+    # 3. Break down the problem or concept into smaller, more manageable parts.
+    # 4. Provide hints, examples, or analogies to help the student understand the underlying principles.
+    # 5. Encourage the student to think critically and arrive at the answer independently.
+    # 6. If the student struggles, offer more specific guidance while still allowing them to take an active role in the learning process.
+    # 7. Once the student arrives at the correct answer, provide feedback and reinforce their understanding.
+    # 8. Offer additional resources or practice problems to help the student solidify their knowledge.
+    
+    # Remember, your goal is not to simply give away the answer but to empower the student to develop their problem-solving skills and deep understanding of the subject matter. 
+    # Maintain a supportive and patient demeanor throughout the interaction.
+    
     # Use the following context to answer the question at the end.
     # Make sure not to make any changes to the context if possible when prepare answers so as to provide accuate responses.
     # If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -268,22 +279,9 @@ def generate_response(vectordb, query,model_name = "anthropic", img_base64 = Non
     # For example, if context has `metadata`:(source:'docu_url', page:1), you should display ('doc_url',  1).
     # """
     general_system_template = """
-    As a Teaching Assistant, your role is to guide students towards the correct answer while providing them with opportunities to learn and grow. 
-    When a student asks a question, follow these steps:
-    1. Acknowledge the student's question and provide positive reinforcement for their effort.
-    2. Assess the student's current understanding of the topic based on their question.
-    3. Break down the problem or concept into smaller, more manageable parts.
-    4. Provide hints, examples, or analogies to help the student understand the underlying principles.
-    5. Encourage the student to think critically and arrive at the answer independently.
-    6. If the student struggles, offer more specific guidance while still allowing them to take an active role in the learning process.
-    7. Once the student arrives at the correct answer, provide feedback and reinforce their understanding.
-    8. Offer additional resources or practice problems to help the student solidify their knowledge.
-    
-    Remember, your goal is not to simply give away the answer but to empower the student to develop their problem-solving skills and deep understanding of the subject matter. 
-    Maintain a supportive and patient demeanor throughout the interaction.
-    
-    Use the following context to answer the question at the end.
-    Make sure not to make any changes to the context if possible when prepare answers so as to provide accuate responses.
+    As a teaching assistant for univeristy students assist students to understand better and get the right answer
+    Use the following context to assist in answering the question at the end.
+    Make sure not to make any changes to the context if possible when preparing answers so as to provide accuate responses.
     If you don't know the answer, just say that you don't know, don't try to make up an answer.
     ----
     {summaries}
@@ -331,10 +329,6 @@ def generate_response(vectordb, query,model_name = "anthropic", img_base64 = Non
         memory=memory,
     )
 
-    # chain = RetrievalQAWithSourcesChain.from_chain_type(model,
-    #                                                     chain_type="stuff",
-    #                                                     retriever=vectordb.as_retriever()
-    #                                                     )
     result = chain.invoke({"question": query},return_only_outputs=True)
 
     return result

@@ -3,6 +3,7 @@ from thirdPartyIntegration import update_neo4j_vectordb, load_llm, load_embeddin
 from search import vector_search, generate_response, configure_llm_only_chain, configure_qa_structure_rag_chain
 from langchain_community.graphs import Neo4jGraph
 import time
+from openai import OpenAI
 
 #Environmental Variable
 import os
@@ -20,8 +21,11 @@ NEO4J_USERNAME = os.getenv('NEO4J_USERNAME')
 NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD')
 NEO4J_DATABASE = "neo4j"
 
-llm_name = "claude"
+llm_name = "gpt-3.5" #"claude"
 course_id = 58877
+
+OPEN_AI_KEY = os.getenv('OPEN_AI_SECRET_KEY')
+client = OpenAI(api_key=OPEN_AI_KEY)
 
 def extract_possible_image_url(content):
   """
@@ -54,6 +58,17 @@ def extract_possible_image_url(content):
   # No image tag found
   return None
 
+def convert_to_ta_resp(data, ques):
+    completion = client.chat.completions.create(
+    model="ft:gpt-3.5-turbo-0125:dami04glorygmailcom::9kImAlxd",
+    messages=[
+        {"role": "system", "content": "You are an university teaching assistant chatbot that guides students"
+         "Don't assume any detail outside what you have been provied"}, 
+        {"role": "user", "content": f"using this context '''{data}''', answer the question '''{ques}'''"}
+        ]
+    )
+    return completion.choices[0].message.content
+
 def main():
     status, _= authenticate(verbose=False)
     if status: #if authentication was successful
@@ -63,15 +78,22 @@ def main():
     embeddings, _ = load_embedding_model()
 
     llm = load_llm(llm_name)
+    llm_claude = load_llm("claude")
 
     # rag_chain: KG augmented response
     model = configure_qa_structure_rag_chain(
         llm, embeddings, embeddings_store_url=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD
     )
 
-    # #get already existing db
+    #get already existing db
     critique_vectordb = update_neo4j_vectordb(mode=1, index_name = "critique", node_label = "critique-instruction")
-    exam_vectordb = update_neo4j_vectordb(mode=1, index_name = "exam_general", node_label = "exam-instruction")    
+    exam_vectordb = update_neo4j_vectordb(mode=1, index_name = "exam_general", node_label = "exam-instruction")   
+
+    # user_input = "I'm so sorry I'm a fool I somehow thought we only needed 2 instead of 3 critiques for 4740. Could I submit c6 late now and take a 7 letter grade penalty? Alternatively, since c6 was already discussed, I could critique another paper:\n\nex.\n\n1. Machine-to-corpus-to-machine training regime: https://arxiv.org/pdf/2110.07178.pdf\n\n2. Character-level language model: https://arxiv.org/pdf/1508.06615.pdf\n\n3. Fixing bottleneck of fixed-length hidden in NMT translation: https://arxiv.org/pdf/1409.0473.pdf \n\n"
+    # result = model.invoke({"question": user_input})["answer"]
+    # print(f"\nquery > {user_input}")
+    # print(f"AI > {result}")
+    # print() 
 
 
     # response = generate_response(critique_vectordb, "Give me steps on how to critique")['answer']
@@ -147,16 +169,17 @@ def main():
     thread_lst = ed.list_threads(course_id, limit = 100, offset = offset, sort = "new" )
 
     def answer_all_thread(thread_lst, offset):
+        #if we have no thread again
+        if not thread_lst:
+            return
+        
         for i, thread in enumerate(thread_lst):
             print(f"Thread {offset+i+1} --> {thread['category']}")
 
-            #if post is an announcement skip
-            if thread["type"].lower() == "announcement":
-                continue
-
-            #Quizzes or Projects
-            if thread['category'].lower() in ["projects","quizzes"]:
-                time.sleep(1)
+            #Quizzes or Projects or announcement
+            if (thread['category'].lower() in ["projects","quizzes"]) or (thread["type"].lower() == "announcement"):
+                # time.sleep(1)
+                print("Skipped because post is an announcement or project or quizz")
                 #Recursively loop through all threads
                 if i == len(thread_lst)-1:
                     offset += len(thread_lst)
@@ -174,7 +197,6 @@ def main():
                     response = generate_response(critique_vectordb, thread['document'])['answer']
                     post_comment(thread['id'], response)
                     print("Answered...")
-
                     #Recursively loop through all threads
                     if i == len(thread_lst)-1:
                         offset += len(thread_lst)
@@ -182,11 +204,10 @@ def main():
                         answer_all_thread(thread_lst, offset)
                     continue
                 #exam
-                if thread['category'].lower() == "exams":
+                elif thread['category'].lower() == "exams":
                     response = generate_response(exam_vectordb, thread['document'])['answer']
                     post_comment(thread['id'], response)
                     print("Answered...")
-
                     #Recursively loop through all threads
                     if i == len(thread_lst)-1:
                         offset += len(thread_lst)
@@ -204,14 +225,14 @@ def main():
                 data = img.content
                 img_type = img.headers['Content-Type']
                 img_base64 = base64.b64encode(data).decode("utf-8")
-                # print(img_base64)
 
                 #critiques
                 if thread['category'].lower() == "critiques":
-                    response = generate_response(critique_vectordb, thread['document'], img_base64 = img_base64, img_type = img_type)['answer']
+                    response = generate_response(critique_vectordb, thread['document'], model_name="anthropic",img_base64 = img_base64, img_type = img_type)['answer']
+                    #before posting rewrite this as a TA
+                    response = convert_to_ta_resp(response, thread['document'])
                     post_comment(thread['id'], response)
                     print("Answered...")
-
                     #Recursively loop through all threads
                     if i == len(thread_lst)-1:
                         offset += len(thread_lst)
@@ -221,10 +242,11 @@ def main():
 
                 #exam
                 if thread['category'].lower() == "exams":
-                    response = generate_response(exam_vectordb, thread['document'],img_base64 = img_base64, img_type = img_type)['answer']
+                    response = generate_response(exam_vectordb, thread['document'],model_name="anthropic",img_base64 = img_base64, img_type = img_type)['answer']
+                    #before posting rewrite this as a TA
+                    response = convert_to_ta_resp(response, thread['document'])
                     post_comment(thread['id'], response)
                     print("Answered...")
-
                     #Recursively loop through all threads
                     if i == len(thread_lst)-1:
                         offset += len(thread_lst)
@@ -233,11 +255,13 @@ def main():
                     continue
                
                 rag_chain_img = configure_qa_structure_rag_chain(
-                    llm, embeddings, embeddings_store_url=NEO4J_URI,
+                    llm_claude, embeddings, embeddings_store_url=NEO4J_URI,
                     username=NEO4J_USERNAME, password=NEO4J_PASSWORD,
                     img_base64=img_base64, img_type = img_type
                     )
                 result = rag_chain_img.invoke({"question": thread['document']})["answer"]
+                #before posting rewrite this as a TA
+                result = convert_to_ta_resp(result, thread['document'])
                 post_comment(thread['id'], result)
                 print("Answered...")
         
