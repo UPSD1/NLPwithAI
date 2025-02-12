@@ -40,7 +40,9 @@ index_name = "ed_ai"
 
 openAIEmbeddings = OpenAIEmbeddings(openai_api_key=OPEN_AI_KEY)
 claude_model = ChatAnthropic(model='claude-3-opus-20240229', temperature=0, anthropic_api_key=CLAUDE_KEY)
-openai_model = ChatOpenAI(model="gpt-3.5-turbo-0125",temperature=0, api_key=OPEN_AI_KEY)
+# openai_model = ChatOpenAI(model="gpt-3.5-turbo-0125",temperature=0, api_key=OPEN_AI_KEY)
+openai_model = ChatOpenAI(temperature=0, model="ft:gpt-3.5-turbo-0125:dami04glorygmailcom::9kImAlxd", openai_api_key = OPEN_AI_KEY)
+
 #-------------------------------------------------------------------------------------------
 
 #--------------------------------Function Declaration---------------------------------------
@@ -516,7 +518,8 @@ def load_llm(llm_name: str):
         return ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", streaming=True, openai_api_key = OPEN_AI_KEY)
     elif llm_name == "claude":
         return ChatAnthropic(model='claude-3-opus-20240229', temperature=0.3, anthropic_api_key=CLAUDE_KEY)
-    
+    elif llm_name == "finetuned":
+        return ChatOpenAI(temperature=0, model_name="ft:gpt-3.5-turbo-0125:dami04glorygmailcom::9kImAlxd", streaming=True, openai_api_key = OPEN_AI_KEY)
     #default use is claude
     return ChatAnthropic(model='claude-3-opus-20240229', temperature=0.3, anthropic_api_key=CLAUDE_KEY)
 #******************************************************

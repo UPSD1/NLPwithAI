@@ -6,3 +6,7 @@ data/
 Neo4j-8704fb9f-Created-2024-05-02.txt
 *.zip
 ReadData/
+*.pyc
+v1/.env
+v2/.env
+venv
